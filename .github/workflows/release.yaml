@@ -90,18 +90,56 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          cat > release-assets/notes.md <<EOF_NOTES
-          OpenAI and Anthropic compatible Copilot Gateway.
+          cat > release-assets/notes.md <<'EOF_NOTES'
+          OpenAI and Anthropic compatible Copilot Gateway for Linux amd64 and arm64.
 
-          Validated on Linux amd64 and arm64: strict types, lint, formatting, protocol tests, compiled container HTTP APIs, headless credential persistence, real MCP tool execution, retries and shutdown.
+          ### Container
 
-          Container: $RELEASE_IMAGE:$RELEASE_VERSION
-          Immutable image: $RELEASE_IMAGE@$RELEASE_DIGEST
+          ```sh
+          docker pull ${RELEASE_IMAGE}:${RELEASE_VERSION}
+          ```
 
-          The multi-platform image includes provenance and an SBOM. The attached amd64/arm64 Docker archives are public downloads and need no registry account. Verify SHA256SUMS, then run docker load --input <archive.tar.gz>.
+          Follow the [setup guide](https://github.com/${GITHUB_REPOSITORY}/blob/${RELEASE_TAG}/README.md) for headless device login and persistent storage. Available models depend on your Copilot account.
 
-          See README.md for one-time headless device login and persistent-volume startup. Copilot entitlement determines available models; no GitHub credential is included in these images.
+          To pin the immutable image:
+
+          ```text
+          ${RELEASE_IMAGE}@${RELEASE_DIGEST}
+          ```
+
+          The multi-platform image includes provenance and an SBOM.
+
+          ### Downloadable images
+
+          Download the archive for your architecture and `SHA256SUMS` from the assets below. These public downloads require no registry account.
+
+          ```sh
+          sha256sum --check SHA256SUMS --ignore-missing
+          docker load --input copilot-gateway-${RELEASE_VERSION}-amd64.tar.gz
+          ```
+
+          For arm64, use `copilot-gateway-${RELEASE_VERSION}-arm64.tar.gz`. Imported image tags end with `-amd64` or `-arm64`.
+
+          ### Validation
+
+          Passed on Linux amd64 and arm64:
+
+          - Strict types, lint, formatting, and protocol tests.
+          - Compiled-container HTTP APIs, headless login persistence, and real MCP tool execution.
+          - Retry handling and graceful shutdown.
+
+          No GitHub credential is included in the images.
           EOF_NOTES
+          bun -e '
+            const path = "release-assets/notes.md";
+            let notes = await Bun.file(path).text();
+            for (const key of ["RELEASE_IMAGE", "RELEASE_VERSION", "RELEASE_DIGEST", "RELEASE_TAG", "GITHUB_REPOSITORY"]) {
+              const value = process.env[key];
+              if (!value) throw new Error("Missing release setting: " + key);
+              notes = notes.replaceAll("${" + key + "}", value);
+            }
+            await Bun.write(path, notes);
+          '
           release_options=()
           if [[ "$RELEASE_VERSION" == *-* ]]; then release_options+=(--prerelease); fi
           gh release create "$RELEASE_TAG" release-assets/*.tar.gz release-assets/SHA256SUMS \
