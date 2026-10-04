@@ -4,7 +4,7 @@ services:
     env_file:
       - ${GATEWAY_ENV_FILE:-.env}
     ports:
-      - "${GATEWAY_BIND_ADDRESS:-127.0.0.1}:${GATEWAY_PUBLISHED_PORT:-4141}:${PORT:-4141}"
+      - "${GATEWAY_BIND_ADDRESS:-0.0.0.0}:${GATEWAY_PUBLISHED_PORT:-4141}:${PORT:-4141}"
     environment:
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:?Set GATEWAY_API_KEY}
       HOST: ${HOST:-0.0.0.0}

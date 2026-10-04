@@ -82,7 +82,7 @@ Token-count estimates use the tokenizer on the serialized request, including sys
 
 Bun loads `.env` in the working directory. See [configuration](configuration.md) for all runtime and Docker overrides, precedence, and examples. [.env.example](../.env.example) lists the defaults. Environment configuration is validated at startup; bad values fail with field names without printing secret values.
 
-Defaults: loopback binding, port 4141, eight simultaneous upstream operations, no local pacing, a five-minute total request deadline (including streaming), a 4 MiB request-body limit, two transient retries, and a one-minute model cache. Change these for your subscription and workload. Requests exceeding capacity receive 429 and `Retry-After`; there is no unbounded waiting queue.
+Defaults: all-interface binding (`0.0.0.0`), port 4141, eight simultaneous upstream operations, no local pacing, a five-minute total request deadline (including streaming), a 4 MiB request-body limit, two transient retries, and a one-minute model cache. Change these for your subscription and workload. Requests exceeding capacity receive 429 and `Retry-After`; there is no unbounded waiting queue.
 
 `GITHUB_TOKEN` overrides the credential file. `GITHUB_TOKEN_FILE` selects an existing private credential. `MODEL_ALIASES` maps explicit names to exact IDs, for example `{"my-claude":"<id-from-model-catalog>"}`. Model names are not rewritten with version-dependent regular expressions. Claude model selection follows accessible catalog IDs rather than a built-in model list.
 
@@ -118,7 +118,7 @@ docker run -d --name copilot-gateway --restart unless-stopped \
   -p 127.0.0.1:4141:4141 ghcr.io/jn-aman/copilot-gateway:latest
 ```
 
-To reach a VM-bound gateway from your laptop, use `ssh -N -L 4141:127.0.0.1:4141 user@your-vm`, then point clients at `http://127.0.0.1:4141`. For shared remote access, configure a TLS reverse proxy and protect the client key. The supplied Compose file keeps the gateway bound to loopback:
+To reach a VM-bound gateway from your laptop, use `ssh -N -L 4141:127.0.0.1:4141 user@your-vm`, then point clients at `http://127.0.0.1:4141`. For shared remote access, configure a TLS reverse proxy and protect the client key. The supplied Compose file publishes on all interfaces. Set `GATEWAY_BIND_ADDRESS=127.0.0.1` for tunnel-only access:
 
 ```sh
 docker compose run --rm gateway bun dist/main.js auth

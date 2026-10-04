@@ -6,7 +6,7 @@ const integer = (fallback: number, min: number, max: number) =>
   z.coerce.number().int().min(min).max(max).default(fallback)
 
 const runtimeSchema = z.object({
-  HOST: z.string().min(1).default("127.0.0.1"),
+  HOST: z.string().min(1).default("0.0.0.0"),
   PORT: integer(4141, 1, 65535),
   ACCOUNT_TYPE: z
     .enum(["individual", "business", "enterprise"])

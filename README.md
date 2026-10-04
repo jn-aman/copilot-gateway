@@ -21,7 +21,7 @@ Then start the server:
 docker compose up -d
 ```
 
-The gateway listens at `http://127.0.0.1:4141`. Keep `.env` and the credential volume when upgrading. To access a VM from your laptop, forward its port:
+The server binds to `0.0.0.0:4141`. Connect at `http://localhost:4141` or `http://<vm-ip>:4141`. Keep `.env` and the credential volume when upgrading. For access through an SSH tunnel, set `GATEWAY_BIND_ADDRESS=127.0.0.1` in `.env` and forward the port:
 
 ```sh
 ssh -N -L 4141:127.0.0.1:4141 user@your-vm
