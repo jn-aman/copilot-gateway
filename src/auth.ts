@@ -10,6 +10,7 @@ import {
 import { dirname } from "node:path"
 import { z } from "zod"
 
+import { loadRuntimeConfig, type RuntimeConfig } from "~/config"
 import { GatewayError } from "~/errors"
 import { readJson } from "~/io"
 import { fetchWithRetry } from "~/retry"
@@ -19,7 +20,6 @@ export type Fetcher = (
   init?: RequestInit,
 ) => Promise<Response>
 const defaultFetch: Fetcher = (input, init) => fetch(input, init)
-const clientId = "Iv1.b507a08c87ecfe98"
 const deviceSchema = z.object({
   device_code: z.string().min(1),
   user_code: z.string().min(1),
@@ -65,22 +65,30 @@ export async function githubJson(
   token: string,
   signal: AbortSignal,
   fetcher: Fetcher = defaultFetch,
+  config: RuntimeConfig = loadRuntimeConfig({}),
 ): Promise<unknown> {
+  signal = AbortSignal.any([
+    signal,
+    AbortSignal.timeout(config.GITHUB_REQUEST_TIMEOUT_MS),
+  ])
   const response = await fetchWithRetry(
     fetcher,
-    `https://api.github.com${path}`,
+    `${config.GITHUB_API_URL}${path}`,
     {
       headers: {
         authorization: `token ${token}`,
         accept: "application/json",
         "user-agent": "copilot-gateway",
-        "editor-version": "vscode/1.115.0",
-        "editor-plugin-version": "copilot-chat/0.44.0",
+        "editor-version": `vscode/${config.EDITOR_VERSION}`,
+        "editor-plugin-version": `copilot-chat/${config.PLUGIN_VERSION}`,
       },
       signal,
       redirect: "error",
     },
-    { retries: 2, maxDelayMs: 5000 },
+    {
+      retries: config.GITHUB_MAX_RETRIES,
+      maxDelayMs: config.GITHUB_MAX_RETRY_DELAY_MS,
+    },
   )
   if (!response.ok) {
     await response.body?.cancel()
@@ -135,16 +143,21 @@ export async function deviceLogin(
   fetcher: Fetcher = defaultFetch,
   wait: (ms: number, signal: AbortSignal) => Promise<void> = waitFor,
   now = Date.now,
+  config: RuntimeConfig = loadRuntimeConfig(),
 ): Promise<string> {
   const post = async (path: string, body: Record<string, string>) => {
-    const response = await fetcher(`https://github.com/login/${path}`, {
+    const bounded = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(config.GITHUB_REQUEST_TIMEOUT_MS),
+    ])
+    const response = await fetcher(`${config.GITHUB_LOGIN_URL}/login/${path}`, {
       method: "POST",
       headers: {
         accept: "application/json",
         "content-type": "application/json",
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+      signal: bounded,
       redirect: "error",
     })
     if (!response.ok) {
@@ -155,10 +168,13 @@ export async function deviceLogin(
         `GitHub login failed (${response.status})`,
       )
     }
-    return readJson(response.body, 1048576, signal, true)
+    return readJson(response.body, 1048576, bounded, true)
   }
   const device = deviceSchema.parse(
-    await post("device/code", { client_id: clientId, scope: "read:user" }),
+    await post("device/code", {
+      client_id: config.GITHUB_OAUTH_CLIENT_ID,
+      scope: config.GITHUB_OAUTH_SCOPE,
+    }),
   )
   announce(device.user_code, device.verification_uri)
   const expiresAt = now() + device.expires_in * 1000
@@ -168,7 +184,7 @@ export async function deviceLogin(
     if (now() >= expiresAt) break
     const result = oauthSchema.parse(
       await post("oauth/access_token", {
-        client_id: clientId,
+        client_id: config.GITHUB_OAUTH_CLIENT_ID,
         device_code: device.device_code,
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       }),
@@ -224,6 +240,7 @@ export class TokenManager {
     private readonly githubToken: string,
     private readonly fetcher: Fetcher = defaultFetch,
     private readonly now = Date.now,
+    private readonly config: RuntimeConfig = loadRuntimeConfig({}),
   ) {}
 
   get ready(): boolean {
@@ -262,7 +279,7 @@ export class TokenManager {
     if (!this.pending) {
       this.pending = this.refresh()
         .catch((error: unknown) => {
-          this.retryAt = this.now() + 5000
+          this.retryAt = this.now() + this.config.TOKEN_REFRESH_COOLDOWN_MS
           this.lastError = error
           if (this.current && this.current.expiresAt > this.now())
             return this.current.token
@@ -280,8 +297,9 @@ export class TokenManager {
       await githubJson(
         "/copilot_internal/v2/token",
         this.githubToken,
-        AbortSignal.timeout(15000),
+        AbortSignal.timeout(this.config.GITHUB_REQUEST_TIMEOUT_MS),
         this.fetcher,
+        this.config,
       ),
     )
     if (!result.success || result.data.expires_at * 1000 <= this.now())
@@ -303,7 +321,11 @@ export class TokenManager {
       expiresAt,
       apiHost,
       refreshAt:
-        this.now() + Math.max(1, lifetime - Math.min(60000, lifetime / 2)),
+        this.now() +
+        Math.max(
+          1,
+          lifetime - Math.min(this.config.TOKEN_REFRESH_SKEW_MS, lifetime / 2),
+        ),
     }
     this.retryAt = 0
     this.lastError = undefined

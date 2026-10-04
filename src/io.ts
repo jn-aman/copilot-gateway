@@ -94,7 +94,7 @@ export async function* sseData(
         const delimiterLength =
           buffer[newline] === "\r" && buffer[newline + 1] === "\n" ? 2 : 1
         buffer = buffer.slice(newline + delimiterLength)
-        eventSize += line.length
+        eventSize += Buffer.byteLength(line, "utf8")
         if (eventSize > maximum)
           throw new GatewayError(
             502,
@@ -109,7 +109,7 @@ export async function* sseData(
           data.push(line.slice(5).replace(/^ /, ""))
         }
       }
-      if (eventSize + buffer.length > maximum)
+      if (eventSize + Buffer.byteLength(buffer, "utf8") > maximum)
         throw new GatewayError(
           502,
           "api_error",

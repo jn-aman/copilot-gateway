@@ -1,3 +1,4 @@
+import type { RuntimeConfig } from "~/config"
 import type { Chunk, Usage } from "~/protocols/schemas"
 
 import { GatewayError } from "~/errors"
@@ -24,10 +25,11 @@ export async function* openaiStream(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
   expectedChoices = 1,
+  maxEventBytes = 1048576,
 ): AsyncGenerator<Uint8Array> {
   const finished = new Set<number>()
   const toolChoices = new Set<number>()
-  for await (const data of sseData(body, signal)) {
+  for await (const data of sseData(body, signal, maxEventBytes)) {
     if (data === "[DONE]") {
       if (finished.size !== expectedChoices)
         throw new GatewayError(
@@ -87,8 +89,9 @@ export async function* nativeStream(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
   protocol: "messages" | "responses",
+  maxEventBytes = 1048576,
 ): AsyncGenerator<Uint8Array> {
-  for await (const data of sseData(body, signal)) {
+  for await (const data of sseData(body, signal, maxEventBytes)) {
     if (data === "[DONE]")
       throw new GatewayError(
         502,
@@ -131,6 +134,14 @@ export async function* nativeStream(
 export async function* anthropicStream(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
+  limits: Pick<
+    RuntimeConfig,
+    "MAX_SSE_EVENT_BYTES" | "MAX_TOOL_BUFFER_BYTES" | "MAX_PARALLEL_TOOLS"
+  > = {
+    MAX_SSE_EVENT_BYTES: 1048576,
+    MAX_TOOL_BUFFER_BYTES: 4194304,
+    MAX_PARALLEL_TOOLS: 128,
+  },
 ): AsyncGenerator<Uint8Array> {
   let started = false
   let textOpen = false
@@ -145,7 +156,7 @@ export async function* anthropicStream(
   const event = (data: { type: string; [key: string]: unknown }) =>
     encodeEvent(data, data.type)
   let ended = false
-  for await (const data of sseData(body, signal)) {
+  for await (const data of sseData(body, signal, limits.MAX_SSE_EVENT_BYTES)) {
     if (data === "[DONE]") {
       ended = true
       break
@@ -198,10 +209,13 @@ export async function* anthropicStream(
       tool.name += delta.function?.name ?? ""
       tool.arguments += delta.function?.arguments ?? ""
       toolBytes +=
-        (delta.id?.length ?? 0) +
-        (delta.function?.name?.length ?? 0) +
-        (delta.function?.arguments?.length ?? 0)
-      if (toolBytes > 4194304 || tools.size > 128)
+        Buffer.byteLength(delta.id ?? "", "utf8") +
+        Buffer.byteLength(delta.function?.name ?? "", "utf8") +
+        Buffer.byteLength(delta.function?.arguments ?? "", "utf8")
+      if (
+        toolBytes > limits.MAX_TOOL_BUFFER_BYTES ||
+        (!tools.has(delta.index) && tools.size >= limits.MAX_PARALLEL_TOOLS)
+      )
         throw new GatewayError(
           502,
           "api_error",

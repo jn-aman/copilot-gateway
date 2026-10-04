@@ -52,5 +52,7 @@ bun start
 
 With native Claude access and the Claude Code CLI installed, `bun run claude` starts both the gateway and Claude Code automatically.
 
-[Configuration and operations](docs/operations.md) · [Release images](https://github.com/jn-aman/copilot-gateway/releases) · [Verification](docs/upstream.md) · [Design assessment](docs/assessment.md)
+All runtime settings can be overridden in `.env` or exported environment variables, including Docker Compose. See [configuration](docs/configuration.md).
+
+[Operations](docs/operations.md) · [Release images](https://github.com/jn-aman/copilot-gateway/releases) · [Verification](docs/upstream.md) · [Design assessment](docs/assessment.md)
 

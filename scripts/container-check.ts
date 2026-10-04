@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import OpenAI from "openai"
 import assert from "node:assert/strict"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -26,6 +26,63 @@ const docker = async (...args: string[]) => {
   return stdout.trim()
 }
 try {
+  const envFile = join(directory, "compose.env")
+  await writeFile(
+    envFile,
+    `GATEWAY_API_KEY=${key}\nPORT=4111\nMAX_RETRIES=4\n`,
+    { mode: 0o600 },
+  )
+  const compose = Bun.spawn(
+    [
+      "docker",
+      "compose",
+      "--env-file",
+      envFile,
+      "--file",
+      "compose.yaml",
+      "config",
+      "--format",
+      "json",
+    ],
+    {
+      env: {
+        ...process.env,
+        GATEWAY_ENV_FILE: envFile,
+        GATEWAY_API_KEY: key,
+        PORT: "4321",
+        MODEL_ALIASES: '{"test-alias":"chat-test"}',
+        GATEWAY_PUBLISHED_PORT: "5432",
+        GATEWAY_IMAGE: image,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  )
+  const definition = (await new Response(compose.stdout).json()) as {
+    services: {
+      gateway: {
+        environment: Record<string, string>
+        ports: Array<{ target: number; published: string }>
+        image: string
+      }
+    }
+  }
+  assert.equal(await compose.exited, 0, "Compose configuration failed")
+  const service = definition.services.gateway
+  assert.equal(
+    service.environment.PORT,
+    "4321",
+    "Exported port did not override .env",
+  )
+  assert.equal(
+    service.environment.MAX_RETRIES,
+    "4",
+    ".env retry setting was not forwarded",
+  )
+  assert.equal(service.environment.MODEL_ALIASES, '{"test-alias":"chat-test"}')
+  assert.equal(service.ports[0]?.target, 4321)
+  assert.equal(service.ports[0]?.published, "5432")
+  assert.equal(service.image, image)
   const preload = join(directory, "preload.js")
   const built = await Bun.build({
     entrypoints: ["tests/fixtures/container-preload.ts"],
@@ -49,6 +106,10 @@ try {
     `type=volume,source=${volume},target=/data`,
     "--mount",
     `type=bind,source=${preload},target=/fixture.js,readonly`,
+    "--env",
+    "GITHUB_OAUTH_CLIENT_ID=fixture-client",
+    "--env",
+    "GITHUB_OAUTH_SCOPE=read:user",
     image,
     "bun",
     "--preload",
@@ -70,13 +131,27 @@ try {
     "--tmpfs",
     "/tmp",
     "--publish",
-    "127.0.0.1::4141",
+    "127.0.0.1::4321",
     "--env",
     `GATEWAY_API_KEY=${key}`,
     "--mount",
     `type=volume,source=${volume},target=/data,readonly`,
     "--env",
     "REQUEST_TIMEOUT_MS=1000",
+    "--env",
+    "PORT=4321",
+    "--env",
+    "LOG_REQUESTS=false",
+    "--env",
+    "SHUTDOWN_GRACE_MS=2000",
+    "--env",
+    "COPILOT_API_URL=https://api.business.githubcopilot.com",
+    "--env",
+    "COPILOT_INTEGRATION_ID=fixture-integration",
+    "--env",
+    "EDITOR_VERSION=9.8.7",
+    "--env",
+    "PLUGIN_VERSION=6.5.4",
     "--mount",
     `type=bind,source=${preload},target=/fixture.js,readonly`,
     image,
@@ -86,7 +161,7 @@ try {
     "dist/main.js",
     "start",
   )
-  const address = await docker("port", container, "4141/tcp")
+  const address = await docker("port", container, "4321/tcp")
   const base = `http://${address}`
   const headers = {
     authorization: `Bearer ${key}`,

@@ -107,7 +107,7 @@ export class ModelCatalog {
   }
 
   private async refresh() {
-    const signal = AbortSignal.timeout(15000)
+    const signal = AbortSignal.timeout(this.config.MODEL_REFRESH_TIMEOUT_MS)
     const response = await this.upstream.request(
       "/models",
       undefined,
@@ -115,7 +115,12 @@ export class ModelCatalog {
       crypto.randomUUID(),
     )
     const parsed = modelsSchema.safeParse(
-      await readJson(response.body, 8388608, signal, true),
+      await readJson(
+        response.body,
+        this.config.MAX_CATALOG_BYTES,
+        signal,
+        true,
+      ),
     )
     if (!parsed.success)
       throw new GatewayError(
@@ -135,7 +140,11 @@ export class ModelCatalog {
     const find = (catalog: z.infer<typeof modelsSchema>) =>
       catalog.data.find((model) => model.id === id)
     let model = find(await this.list(signal))
-    if (!model && this.now() - this.lastForcedRefresh >= 5000) {
+    if (
+      !model &&
+      this.now() - this.lastForcedRefresh >=
+        this.config.MODEL_REFRESH_COOLDOWN_MS
+    ) {
       this.lastForcedRefresh = this.now()
       model = find(await this.list(signal, true))
     }
@@ -237,7 +246,23 @@ export class ModelCatalog {
               Number(a.model_picker_enabled ?? true) ||
             b.id.localeCompare(a.id, undefined, { numeric: true }),
         )[0]
-    const primary = newest("sonnet") ?? newest("opus") ?? newest("haiku")
+    const select = (id: string | undefined) => {
+      if (!id) return undefined
+      const exact = this.config.aliases[id] ?? id
+      const model = models.find((entry) => entry.id === exact)
+      if (!model)
+        throw new GatewayError(
+          400,
+          "invalid_request_error",
+          `Claude launcher model ${id} is not a policy-allowed native Claude model`,
+        )
+      return model
+    }
+    const primary =
+      select(this.config.CLAUDE_MODEL) ??
+      newest("sonnet") ??
+      newest("opus") ??
+      newest("haiku")
     if (!primary)
       throw new GatewayError(
         503,
@@ -246,8 +271,13 @@ export class ModelCatalog {
       )
     return {
       primary: primary.id,
-      fast: (newest("haiku") ?? primary).id,
-      opus: (newest("opus") ?? primary).id,
+      fast: (
+        select(this.config.CLAUDE_FAST_MODEL) ??
+        newest("haiku") ??
+        primary
+      ).id,
+      opus: (select(this.config.CLAUDE_OPUS_MODEL) ?? newest("opus") ?? primary)
+        .id,
     }
   }
 }

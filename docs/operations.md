@@ -80,19 +80,19 @@ Token-count estimates use the tokenizer on the serialized request, including sys
 
 ## Configuration
 
-Bun loads `.env` in the working directory. See [.env.example](../.env.example) for all settings. Environment configuration is validated at startup; bad values fail with field names without printing secret values.
+Bun loads `.env` in the working directory. See [configuration](configuration.md) for all runtime and Docker overrides, precedence, and examples. [.env.example](../.env.example) lists the defaults. Environment configuration is validated at startup; bad values fail with field names without printing secret values.
 
 Defaults: loopback binding, port 4141, eight simultaneous upstream operations, no local pacing, a five-minute total request deadline (including streaming), a 4 MiB request-body limit, two transient retries, and a one-minute model cache. Change these for your subscription and workload. Requests exceeding capacity receive 429 and `Retry-After`; there is no unbounded waiting queue.
 
 `GITHUB_TOKEN` overrides the credential file. `GITHUB_TOKEN_FILE` selects an existing private credential. `MODEL_ALIASES` maps explicit names to exact IDs, for example `{"my-claude":"<id-from-model-catalog>"}`. Model names are not rewritten with version-dependent regular expressions. Claude model selection follows accessible catalog IDs rather than a built-in model list.
 
-Copilot token refresh is shared across callers, refreshes ahead of expiry, honors changed lifetimes, backs off on failure, and retains a still-valid credential during a temporary failure. The API host supplied in credential metadata wins over account-type defaults. Only HTTPS origins under `githubcopilot.com`, without credentials, custom ports, paths or queries, are accepted. Redirects are rejected.
+Copilot token refresh is shared across callers, refreshes ahead of expiry, honors changed lifetimes, backs off on failure, and retains a still-valid credential during a temporary failure. An explicit `COPILOT_API_URL` wins over the API host supplied in credential metadata, which wins over account-type defaults. Configured endpoint origins must use HTTPS; set them only to services you trust with credentials. Automatically discovered hosts remain restricted to Copilot. Only discovered HTTPS origins under `githubcopilot.com`, without credentials, custom ports, paths or queries, are accepted. Redirects are rejected.
 
 Retries use exponential jitter and honor numeric/date `Retry-After` values. Read requests retry network errors and 408/429/502/503/504. Generations retry explicit 429 rejection and refresh once after 401. An ambiguous generation network/5xx failure or an interrupted stream is never replayed by the gateway; the request may already have incurred work. Long cooldowns and `x-should-retry: false` are returned to clients. Retry waits are cancellable and share the request deadline.
 
 Logs contain generated request IDs, known route names, status and duration. Prompt text, tool arguments, and credentials are not logged. Credentials are not served over HTTP. CORS is disabled. For remote deployment, terminate TLS in front of the gateway and keep the gateway key private. The credential belongs to one Copilot account; this is not a multi-tenant gateway.
 
-SIGINT/SIGTERM stops new work, drains existing requests for up to ten seconds, then aborts remaining work and closes the server.
+SIGINT/SIGTERM stops new work, drains existing requests for `SHUTDOWN_GRACE_MS` (ten seconds by default), then aborts remaining work and closes the server.
 
 ## Container
 
@@ -112,7 +112,7 @@ Start the gateway using that volume:
 
 ```sh
 docker run -d --name copilot-gateway --restart unless-stopped \
-  --env-file .env --read-only --tmpfs /tmp --cap-drop ALL \
+  --env-file .env -e HOST=0.0.0.0 --read-only --tmpfs /tmp --cap-drop ALL \
   --security-opt no-new-privileges:true \
   -v copilot-gateway-data:/data:ro \
   -p 127.0.0.1:4141:4141 ghcr.io/jn-aman/copilot-gateway:latest
@@ -132,7 +132,7 @@ For local source builds and an existing host credential:
 ```sh
 docker build -t copilot-gateway .
 docker run --rm -p 127.0.0.1:4141:4141 \
-  --env-file .env \
+  --env-file .env -e HOST=0.0.0.0 \
   -e GITHUB_TOKEN_FILE=/credentials/github-token \
   -v "$HOME/.local/share/copilot-gateway:/credentials:ro" \
   copilot-gateway

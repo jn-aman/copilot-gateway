@@ -120,13 +120,14 @@ export class Gateway {
       this.metrics.totalDurationMs += durationMs
       if (status >= 400) this.metrics.errors++
       if (streamError) this.metrics.streamErrors++
-      this.log({
-        requestId,
-        method: request.method,
-        route: knownPaths.has(path) ? path : "unknown",
-        status,
-        durationMs,
-      })
+      if (this.config.LOG_REQUESTS === "true")
+        this.log({
+          requestId,
+          method: request.method,
+          route: knownPaths.has(path) ? path : "unknown",
+          status,
+          durationMs,
+        })
     }
     const json = (body: unknown, status = 200, headers = new Headers()) => {
       headers.set("x-request-id", requestId)
@@ -344,7 +345,12 @@ export class Gateway {
           : undefined,
       )
       if (!payload.stream) {
-        let result = await readJson(response.body, 16777216, scope.signal, true)
+        let result = await readJson(
+          response.body,
+          this.config.MAX_RESPONSE_BYTES,
+          scope.signal,
+          true,
+        )
         if (
           endpoint === "/embeddings" &&
           typeof result === "object" &&
@@ -401,14 +407,20 @@ export class Gateway {
         )
       }
       const iterator = translated
-        ? anthropicStream(response.body, scope.signal)
+        ? anthropicStream(response.body, scope.signal, this.config)
         : protocol === "openai"
           ? openaiStream(
               response.body,
               scope.signal,
               typeof payload.n === "number" ? payload.n : 1,
+              this.config.MAX_SSE_EVENT_BYTES,
             )
-          : nativeStream(response.body, scope.signal, protocol)
+          : nativeStream(
+              response.body,
+              scope.signal,
+              protocol,
+              this.config.MAX_SSE_EVENT_BYTES,
+            )
       const stream = this.streamResponse(
         iterator,
         response.body,

@@ -9,7 +9,13 @@ const mockedFetch: typeof fetch = Object.assign(
   ): Promise<Response> => {
     const url = new URL(input instanceof Request ? input.url : String(input))
     if (url.hostname === "github.com") {
-      if (url.pathname === "/login/device/code")
+      if (url.pathname === "/login/device/code") {
+        const body = JSON.parse(String(init?.body)) as Record<string, string>
+        if (
+          body.client_id !== process.env.GITHUB_OAUTH_CLIENT_ID ||
+          body.scope !== process.env.GITHUB_OAUTH_SCOPE
+        )
+          throw new Error("Login environment overrides did not reach GitHub")
         return Response.json({
           device_code: "fixture-device",
           user_code: "TEST-ONLY",
@@ -17,6 +23,7 @@ const mockedFetch: typeof fetch = Object.assign(
           expires_in: 60,
           interval: 0.01,
         })
+      }
       if (url.pathname === "/login/oauth/access_token")
         return Response.json({ access_token: "fixture-oauth-credential" })
     }
@@ -31,8 +38,15 @@ const mockedFetch: typeof fetch = Object.assign(
       if (url.pathname === "/copilot_internal/user")
         return Response.json({ quota_snapshots: {} })
     }
-    if (url.hostname !== "api.githubcopilot.com")
+    if (url.hostname !== "api.business.githubcopilot.com")
       throw new Error("Unexpected fixture origin")
+    const headers = new Headers(init?.headers)
+    if (
+      headers.get("copilot-integration-id") !== "fixture-integration" ||
+      headers.get("editor-version") !== "vscode/9.8.7" ||
+      headers.get("editor-plugin-version") !== "copilot-chat/6.5.4"
+    )
+      throw new Error("Upstream environment overrides did not reach Copilot")
     if (url.pathname === "/models") return Response.json(modelCatalog)
     const payload = JSON.parse(String(init?.body ?? "{}")) as Record<
       string,

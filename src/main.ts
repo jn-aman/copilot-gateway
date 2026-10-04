@@ -76,7 +76,9 @@ async function main() {
   }
   const upstream = new CopilotUpstream(config, githubToken)
   const gateway = new Gateway(config, upstream)
-  const catalog = await gateway.catalog.list(AbortSignal.timeout(20000))
+  const catalog = await gateway.catalog.list(
+    AbortSignal.timeout(config.STARTUP_TIMEOUT_MS),
+  )
   if (command === "setup" || command === "doctor") {
     console.log(
       JSON.stringify(
@@ -95,20 +97,23 @@ async function main() {
     )
     return
   }
-  const executable = command === "claude" ? Bun.which("claude") : undefined
+  const executable =
+    command === "claude" ? Bun.which(config.CLAUDE_BIN) : undefined
   if (command === "claude" && !executable)
     throw new Error(
       "Claude Code CLI is not installed or not in PATH. Install it before running bun run claude.",
     )
   const models =
     command === "claude"
-      ? await gateway.catalog.claudeModels(AbortSignal.timeout(20000))
+      ? await gateway.catalog.claudeModels(
+          AbortSignal.timeout(config.STARTUP_TIMEOUT_MS),
+        )
       : undefined
   const server = Bun.serve({
     hostname: config.HOST,
     port: config.PORT,
     maxRequestBodySize: config.MAX_BODY_BYTES,
-    idleTimeout: 30,
+    idleTimeout: config.SERVER_IDLE_TIMEOUT_SECONDS,
     fetch: async (request, server) => {
       // Application deadlines cover inference and streaming; the server's default
       // idle timeout would otherwise interrupt long thinking before first bytes.
@@ -128,7 +133,7 @@ async function main() {
     const force = setTimeout(() => {
       gateway.abort()
       void server.stop(true)
-    }, 10000)
+    }, config.SHUTDOWN_GRACE_MS)
     force.unref()
     try {
       await server.stop(false)
@@ -145,7 +150,10 @@ async function main() {
   process.once("SIGTERM", interrupt)
   if (executable && models) {
     try {
-      const launch = claudeArguments(process.argv.slice(3))
+      const launch = claudeArguments(
+        process.argv.slice(3),
+        config.CLAUDE_PROJECT ?? process.cwd(),
+      )
       if (!(await stat(launch.cwd)).isDirectory())
         throw new Error("Claude project path must be a directory")
       child = Bun.spawn([executable, ...launch.args], {

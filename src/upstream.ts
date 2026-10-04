@@ -29,7 +29,7 @@ export class CopilotUpstream implements Upstream {
     private readonly githubToken: string,
     private readonly fetcher: Fetcher = (input, init) => fetch(input, init),
   ) {
-    this.tokens = new TokenManager(githubToken, fetcher)
+    this.tokens = new TokenManager(githubToken, fetcher, Date.now, config)
     this.baseUrl =
       config.ACCOUNT_TYPE === "individual"
         ? "https://api.githubcopilot.com"
@@ -57,14 +57,14 @@ export class CopilotUpstream implements Upstream {
         authorization: `Bearer ${token}`,
         "content-type": "application/json",
         accept: payload?.stream ? "text/event-stream" : "application/json",
-        "copilot-integration-id": "vscode-chat",
+        "copilot-integration-id": this.config.COPILOT_INTEGRATION_ID,
         "editor-version": `vscode/${this.config.EDITOR_VERSION}`,
         "editor-plugin-version": `copilot-chat/${this.config.PLUGIN_VERSION}`,
         "user-agent": `GitHubCopilotChat/${this.config.PLUGIN_VERSION}`,
-        "openai-intent": "conversation-panel",
+        "openai-intent": this.config.COPILOT_INTENT,
         "x-github-api-version": this.config.COPILOT_API_VERSION,
         "x-request-id": requestId,
-        "x-interaction-type": "conversation-panel",
+        "x-interaction-type": this.config.COPILOT_INTERACTION_TYPE,
         ...extraHeaders,
       }
       const entries = Array.isArray(payload?.messages)
@@ -100,7 +100,7 @@ export class CopilotUpstream implements Upstream {
       const send = () =>
         fetchWithRetry(
           this.fetcher,
-          `${this.tokens.apiHost ?? this.baseUrl}${path}`,
+          `${this.config.COPILOT_API_URL ?? this.tokens.apiHost ?? this.baseUrl}${path}`,
           init,
           {
             retries: this.config.MAX_RETRIES,
@@ -169,6 +169,7 @@ export class CopilotUpstream implements Upstream {
       this.githubToken,
       signal,
       this.fetcher,
+      this.config,
     )
   }
 }
