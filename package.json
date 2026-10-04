@@ -1,0 +1,41 @@
+{
+  "name": "copilot-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local, authenticated Copilot gateway for OpenAI and Anthropic clients",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.3.9"
+  },
+  "scripts": {
+    "dev": "bun --watch src/main.ts start",
+    "start": "bun src/main.ts start",
+    "auth": "bun src/main.ts auth",
+    "setup": "bun src/main.ts setup",
+    "doctor": "bun src/main.ts doctor",
+    "claude": "bun src/main.ts claude",
+    "build": "bun build src/main.ts --target=bun --outdir=dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --deny-warnings src tests scripts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "bun test",
+    "test:live": "bun scripts/live-check.ts",
+    "test:container": "bun scripts/container-check.ts",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun test && bun run build"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^4.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@types/bun": "^1.4.2",
+    "openai": "^7.27.0",
+    "oxlint": "^1.86.0",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2"
+  }
+}

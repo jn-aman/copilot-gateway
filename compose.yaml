@@ -1,0 +1,21 @@
+services:
+  gateway:
+    image: ghcr.io/jn-aman/copilot-gateway:latest
+    ports:
+      - "127.0.0.1:4141:4141"
+    environment:
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:?Set GATEWAY_API_KEY}
+      HOST: 0.0.0.0
+    volumes:
+      - credentials:/data
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  credentials:
