@@ -56,3 +56,4 @@ All runtime settings can be overridden in `.env` or exported environment variabl
 
 [Operations](docs/operations.md) · [Release images](https://github.com/jn-aman/copilot-gateway/releases) · [Verification](docs/upstream.md) · [Design assessment](docs/assessment.md)
 
+Independent project using private Copilot APIs. Licensed under [MIT](LICENSE).

@@ -162,5 +162,6 @@ The dependency lockfile records the latest npm releases installed during this re
 
 Container checks run the actual compiled entry point with a test-only transport mounted through Bun's preload facility. They verify APIs over real HTTP, owner-only headless credential persistence across separate login/server containers, read-only filesystem operation, non-root execution, protocol streaming, MCP discovery/execution/results, rate-limit retry, and graceful shutdown. The test transport is neither bundled nor copied into the production image and makes no live requests. Live Copilot checks remain separate.
 
-[Assessment](assessment.md) records what was kept, replaced, and intentionally excluded. [Upstream findings](upstream.md) records the source evidence and the limits of live verification.
+[Design decisions](assessment.md) explains the architecture and operating boundaries. [Upstream findings](upstream.md) records the source evidence and the limits of live verification.
 
+Licensed under [MIT](../LICENSE).
