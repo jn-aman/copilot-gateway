@@ -68,11 +68,11 @@ async function main() {
   const config = loadConfig()
   let githubToken: string
   try {
-    githubToken = await readGithubToken(process.env, config.tokenFile)
+    githubToken = await readGithubToken(config.tokenFile)
   } catch (error) {
     if (command !== "setup") throw error
     await authenticate()
-    githubToken = await readGithubToken(process.env, config.tokenFile)
+    githubToken = await readGithubToken(config.tokenFile)
   }
   const upstream = new CopilotUpstream(config, githubToken)
   const gateway = new Gateway(config, upstream)

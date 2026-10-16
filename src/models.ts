@@ -82,6 +82,21 @@ export function catalogSummary(models: Model[]) {
   }
 }
 
+// Claude Code sends Anthropic IDs (claude-opus-5-5, optional -YYYYMMDD date or
+// [1m] suffix) while Copilot lists claude-opus-5.5.
+export function findModel(models: Model[], name: string): Model | undefined {
+  const exact = models.find((model) => model.id === name)
+  if (exact) return exact
+  const key = (id: string) =>
+    id
+      .toLowerCase()
+      .replace(/\[[^\]]*\]$/, "")
+      .replace(/-\d{8}$/, "")
+      .replaceAll(".", "-")
+  const matches = models.filter((model) => key(model.id) === key(name))
+  return matches.length === 1 ? matches[0] : undefined
+}
+
 export class ModelCatalog {
   private cached?: z.infer<typeof modelsSchema>
   private expiresAt = 0
@@ -135,10 +150,10 @@ export class ModelCatalog {
 
   async resolve(name: string, signal: AbortSignal): Promise<Model> {
     const id = Object.hasOwn(this.config.aliases, name)
-      ? this.config.aliases[name]
+      ? (this.config.aliases[name] ?? name)
       : name
     const find = (catalog: z.infer<typeof modelsSchema>) =>
-      catalog.data.find((model) => model.id === id)
+      findModel(catalog.data, id)
     let model = find(await this.list(signal))
     if (
       !model &&
@@ -249,7 +264,7 @@ export class ModelCatalog {
     const select = (id: string | undefined) => {
       if (!id) return undefined
       const exact = this.config.aliases[id] ?? id
-      const model = models.find((entry) => entry.id === exact)
+      const model = findModel(models, exact)
       if (!model)
         throw new GatewayError(
           400,

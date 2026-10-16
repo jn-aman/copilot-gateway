@@ -84,7 +84,7 @@ Bun loads `.env` in the working directory. See [configuration](configuration.md)
 
 Defaults: all-interface binding (`0.0.0.0`), port 4141, eight simultaneous upstream operations, no local pacing, a five-minute total request deadline (including streaming), a 4 MiB request-body limit, two transient retries, and a one-minute model cache. Change these for your subscription and workload. Requests exceeding capacity receive 429 and `Retry-After`; there is no unbounded waiting queue.
 
-`GITHUB_TOKEN` overrides the credential file. `GITHUB_TOKEN_FILE` selects an existing private credential. `MODEL_ALIASES` maps explicit names to exact IDs, for example `{"my-claude":"<id-from-model-catalog>"}`. Model names are not rewritten with version-dependent regular expressions. Claude model selection follows accessible catalog IDs rather than a built-in model list.
+The gateway ignores any `GITHUB_TOKEN` in the environment and reads only the device-login credential or `GITHUB_TOKEN_FILE`, which selects an existing private credential. `MODEL_ALIASES` maps explicit names to exact IDs, for example `{"my-claude":"<id-from-model-catalog>"}`. Names with no exact match fall back to a unique catalog match that ignores case, a `[1m]` suffix, a `-YYYYMMDD` date suffix, and dot versus hyphen, so `claude-opus-5-5` reaches `claude-opus-5.5`. Ambiguous names are rejected. Claude model selection follows accessible catalog IDs rather than a built-in model list.
 
 Copilot token refresh is shared across callers, refreshes ahead of expiry, honors changed lifetimes, backs off on failure, and retains a still-valid credential during a temporary failure. An explicit `COPILOT_API_URL` wins over the API host supplied in credential metadata, which wins over account-type defaults. Configured endpoint origins must use HTTPS; set them only to services you trust with credentials. Automatically discovered hosts remain restricted to Copilot. Only discovered HTTPS origins under `githubcopilot.com`, without credentials, custom ports, paths or queries, are accepted. Redirects are rejected.
 
@@ -138,7 +138,7 @@ docker run --rm -p 127.0.0.1:4141:4141 \
   copilot-gateway
 ```
 
-The container runs as the unprivileged Bun user (UID 1000); a host-mounted credential must be readable by that UID. Device login into the named volume handles ownership automatically. An OAuth `GITHUB_TOKEN` environment override remains available for runtime secret injection in managed deployments.
+The container runs as the unprivileged Bun user (UID 1000); a host-mounted credential must be readable by that UID. Device login into the named volume handles ownership automatically. Managed deployments inject the credential as a file through `GITHUB_TOKEN_FILE`.
 
 ## Releases
 

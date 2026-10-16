@@ -63,20 +63,19 @@ Endpoint overrides must be HTTPS origins without paths, query strings, or creden
 
 ## Login and credentials
 
-| Variable                    | Default                          | Meaning                                                                                 |
-| --------------------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
-| `GITHUB_TOKEN`              | unset                            | Optional runtime OAuth credential; device login avoids this variable. PATs are rejected |
-| `GITHUB_TOKEN_FILE`         | automatic                        | Credential file override                                                                |
-| `XDG_DATA_HOME`             | `~/.local/share`; Docker `/data` | Credential directory; file is `copilot-gateway/github-token` underneath                 |
-| `GITHUB_API_URL`            | `https://api.github.com`         | GitHub token exchange / usage origin                                                    |
-| `GITHUB_LOGIN_URL`          | `https://github.com`             | Device authorization origin                                                             |
-| `GITHUB_OAUTH_CLIENT_ID`    | `Iv1.b507a08c87ecfe98`           | Device-flow OAuth application                                                           |
-| `GITHUB_OAUTH_SCOPE`        | `read:user`                      | Requested OAuth scope; custom applications must support Copilot access                  |
-| `GITHUB_REQUEST_TIMEOUT_MS` | `15000`                          | GitHub request deadline                                                                 |
-| `GITHUB_MAX_RETRIES`        | `2`                              | Safe GitHub read retry budget                                                           |
-| `GITHUB_MAX_RETRY_DELAY_MS` | `5000`                           | Largest GitHub retry wait                                                               |
-| `TOKEN_REFRESH_COOLDOWN_MS` | `5000`                           | Cooldown after token refresh failure                                                    |
-| `TOKEN_REFRESH_SKEW_MS`     | `60000`                          | Refresh ahead of expiry, capped at half the token lifetime                              |
+| Variable                    | Default                          | Meaning                                                                 |
+| --------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
+| `GITHUB_TOKEN_FILE`         | automatic                        | Credential file override                                                |
+| `XDG_DATA_HOME`             | `~/.local/share`; Docker `/data` | Credential directory; file is `copilot-gateway/github-token` underneath |
+| `GITHUB_API_URL`            | `https://api.github.com`         | GitHub token exchange / usage origin                                    |
+| `GITHUB_LOGIN_URL`          | `https://github.com`             | Device authorization origin                                             |
+| `GITHUB_OAUTH_CLIENT_ID`    | `Iv1.b507a08c87ecfe98`           | Device-flow OAuth application                                           |
+| `GITHUB_OAUTH_SCOPE`        | `read:user`                      | Requested OAuth scope; custom applications must support Copilot access  |
+| `GITHUB_REQUEST_TIMEOUT_MS` | `15000`                          | GitHub request deadline                                                 |
+| `GITHUB_MAX_RETRIES`        | `2`                              | Safe GitHub read retry budget                                           |
+| `GITHUB_MAX_RETRY_DELAY_MS` | `5000`                           | Largest GitHub retry wait                                               |
+| `TOKEN_REFRESH_COOLDOWN_MS` | `5000`                           | Cooldown after token refresh failure                                    |
+| `TOKEN_REFRESH_SKEW_MS`     | `60000`                          | Refresh ahead of expiry, capped at half the token lifetime              |
 
 `auth` does not require `GATEWAY_API_KEY`. Credentials persist with owner-only permissions. Keep them out of Git and images. Custom mounted paths must be writable for login and readable by container UID 1000.
 

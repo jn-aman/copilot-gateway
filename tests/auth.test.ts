@@ -217,11 +217,26 @@ test("credentials are atomically persisted with owner-only permissions", async (
   try {
     const path = join(directory, "private", "github-token")
     await writeGithubToken(path, "github-secret")
-    expect(await readGithubToken({}, path)).toBe("github-secret")
+    expect(await readGithubToken(path)).toBe("github-secret")
     expect((await stat(path)).mode & 0o777).toBe(0o600)
     await writeGithubToken(path, "replacement")
-    expect(await readGithubToken({}, path)).toBe("replacement")
+    expect(await readGithubToken(path)).toBe("replacement")
   } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test("GITHUB_TOKEN in the environment is ignored", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gateway-auth-test-"))
+  const previous = process.env.GITHUB_TOKEN
+  try {
+    const path = join(directory, "github-token")
+    await writeGithubToken(path, "github-secret")
+    process.env.GITHUB_TOKEN = "dummy-pat"
+    expect(await readGithubToken(path)).toBe("github-secret")
+  } finally {
+    if (previous === undefined) delete process.env.GITHUB_TOKEN
+    else process.env.GITHUB_TOKEN = previous
     await rm(directory, { recursive: true, force: true })
   }
 })

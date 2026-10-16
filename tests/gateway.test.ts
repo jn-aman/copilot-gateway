@@ -496,6 +496,14 @@ describe("lifecycle and failures", () => {
     expect(JSON.stringify(logs)).not.toContain(apiKey)
     expect(JSON.stringify(logs)).not.toContain("conversation")
   })
+  test("Anthropic-style model names reach upstream as the Copilot ID", async () => {
+    const { gateway, upstream } = make()
+    const response = await gateway.handle(
+      request("/v1/messages", { ...messages, model: "claude-sonnet-4-6" }),
+    )
+    expect(response.status).toBe(200)
+    expect(upstream.calls.at(-1)?.payload?.model).toBe("claude-sonnet-4.6")
+  })
   test("concurrency slots cover the entire stream and release on cancellation", async () => {
     const { gateway, upstream } = make({ MAX_CONCURRENT_REQUESTS: "1" })
     let cancelled = false

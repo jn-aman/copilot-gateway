@@ -105,11 +105,7 @@ export async function githubJson(
   }
 }
 
-export async function readGithubToken(
-  env: Record<string, string | undefined>,
-  path: string,
-): Promise<string> {
-  if (env.GITHUB_TOKEN?.trim()) return env.GITHUB_TOKEN.trim()
+export async function readGithubToken(path: string): Promise<string> {
   try {
     const token = (await readFile(path, "utf8")).trim()
     if (!token) throw new Error("Empty credential file")
@@ -117,9 +113,7 @@ export async function readGithubToken(
     if (((await stat(path)).mode & 0o077) !== 0) await chmod(path, 0o600)
     return token
   } catch {
-    throw new Error(
-      "No GitHub credential available. Run bun run auth or set GITHUB_TOKEN.",
-    )
+    throw new Error("No GitHub credential available. Run bun run auth.")
   }
 }
 

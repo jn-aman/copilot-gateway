@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 
 import { catalogSummary, ModelCatalog, modelSupportsEndpoint } from "~/models"
+import type { Model } from "~/models"
 
 import { config, FakeUpstream } from "./helpers"
 
@@ -61,4 +62,38 @@ test("legacy capability types cannot send embeddings to chat or completion model
       {},
     ),
   ).toThrow("does not support")
+})
+
+const catalogWith = (ids: string[]) => {
+  const upstream = new FakeUpstream()
+  upstream.request = async () =>
+    Response.json({ data: ids.map((id): Model => ({ id })) })
+  return new ModelCatalog(upstream, config())
+}
+const resolveId = (ids: string[], name: string) =>
+  catalogWith(ids)
+    .resolve(name, new AbortController().signal)
+    .then((model) => model.id)
+
+test("Anthropic-style names resolve to the unique Copilot model", async () => {
+  const ids = ["claude-opus-5.5", "claude-opus-5", "claude-sonnet-5.5"]
+  for (const name of [
+    "claude-opus-5-5",
+    "claude-opus-5-5[1m]",
+    "CLAUDE-OPUS-5-5",
+    "claude-opus-5-5-20261001",
+  ])
+    expect(await resolveId(ids, name)).toBe("claude-opus-5.5")
+  expect(await resolveId(ids, "claude-opus-5")).toBe("claude-opus-5")
+})
+
+test("exact IDs win over normalized matches and ambiguity or unknown names are 404", async () => {
+  expect(
+    await resolveId(["claude-x-1.0", "claude-x-1-0"], "claude-x-1-0"),
+  ).toBe("claude-x-1-0")
+  for (const [ids, name] of [
+    [["claude-x-1.0", "claude-x-1-0"], "CLAUDE-X-1-0"],
+    [["claude-opus-5.5"], "claude-opus-9-9"],
+  ] as const)
+    expect(resolveId([...ids], name)).rejects.toMatchObject({ status: 404 })
 })

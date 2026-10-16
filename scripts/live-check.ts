@@ -12,7 +12,7 @@ import { CopilotUpstream } from "~/upstream"
 // Explicit, bounded checks, outside normal tests. One account rejection must
 // not hide the other protocols. Discovery does not establish entitlement.
 const config = loadConfig()
-const token = await readGithubToken(process.env, config.tokenFile)
+const token = await readGithubToken(config.tokenFile)
 const gateway = new Gateway(
   config,
   new CopilotUpstream(config, token),
